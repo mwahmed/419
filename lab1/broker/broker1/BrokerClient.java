@@ -40,7 +40,7 @@ public class BrokerClient {
 		System.out.println("Enter queries or x for exit:");
 		System.out.print("> ");
 		while ((userInput = stdIn.readLine()) != null
-				&& userInput.toLowerCase().indexOf("x") == -1) {
+				&& !userInput.toLowerCase().equals("x")) {
 			/* make a new request packet */
 			BrokerPacket packetToServer = new BrokerPacket();
 			packetToServer.type = BrokerPacket.BROKER_REQUEST;

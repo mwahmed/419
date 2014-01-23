@@ -24,7 +24,7 @@ public class BrokerServerHandlerThread extends Thread {
 			ObjectOutputStream toClient = new ObjectOutputStream(socket.getOutputStream());
 			
 			String content = new Scanner(new File("nasdaq")).useDelimiter("\\Z").next();
-			System.out.println(content);
+			//System.out.println(content);
 			while (( packetFromClient = (BrokerPacket) fromClient.readObject()) != null) {
 				/* create a packet to send reply back to client */
 				BrokerPacket packetToClient = new BrokerPacket();
@@ -43,9 +43,9 @@ public class BrokerServerHandlerThread extends Thread {
 				      String[] tmp = s.split(" ");
 				      String company = tmp[0];
 				      String value = tmp[1];
-				      System.out.println("Request: " + packetFromClient.symbol);
-				      System.out.println("STRING: " + company);
-				      System.out.println("value: " + Long.parseLong(value));
+				      //System.out.println("Request: " + packetFromClient.symbol);
+				      //System.out.println("STRING: " + company);
+				      //System.out.println("value: " + Long.parseLong(value));
 				      if (packetFromClient.symbol.equals(company)){
 				    	  packetToClient.quote = Long.parseLong(value); //packetFromClient.message;
 				    	  break;

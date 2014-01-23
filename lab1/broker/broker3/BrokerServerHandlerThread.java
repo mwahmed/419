@@ -28,6 +28,7 @@ public class BrokerServerHandlerThread extends Thread {
 
 		boolean gotByePacket = false;
 		
+		
 		try {
 			/* stream to read from client */
 			ObjectInputStream fromClient = new ObjectInputStream(socket.getInputStream());
@@ -40,6 +41,10 @@ public class BrokerServerHandlerThread extends Thread {
 			
 			
 			while (( packetFromClient = (BrokerPacket) fromClient.readObject()) != null) {
+				/*System.out.println(role);
+				System.out.println(lookup_host);
+				System.out.println(lookup_port);
+				*/
 				/* create a packet to send reply back to client */
 				BrokerPacket packetToClient = new BrokerPacket();
 				packetToClient.type = BrokerPacket.BROKER_QUOTE;
@@ -51,7 +56,7 @@ public class BrokerServerHandlerThread extends Thread {
 				
 				/* process message */
 				/* just echo in this example */
-				if(packetFromClient.type == BrokerPacket.BROKER_REQUEST) {
+				if(packetFromClient.type == BrokerPacket.BROKER_REQUEST || packetFromClient.type == BrokerPacket.BROKER_FORWARD) {
 					
 					//System.out.println("From Client: " + packetFromClient.message);
 					int check = 0;
@@ -82,9 +87,167 @@ public class BrokerServerHandlerThread extends Thread {
 					}
 					else
 					{
-						packetToClient.quote = (long) 0;
-						packetToClient.type = BrokerPacket.BROKER_ERROR;
-						packetToClient.symbol = company_name.toUpperCase() + " invalid.";
+						// Try forwarding first
+						//lookup_host
+						int bool = 0;
+						boolean conn = false;
+						int result = 0;
+						if (packetFromClient.type == BrokerPacket.BROKER_FORWARD)
+						{
+							bool=-1;
+							result = -1;
+						}
+						if (bool == 0)
+						{
+							
+							Socket brokerSocket = null;
+							ObjectOutputStream broker_out = null;
+							ObjectInputStream broker_in = null;
+							String broker_host = null;
+							String broker_port = null;
+							
+							
+							Socket lookupSocket = null;
+							ObjectOutputStream lookup_out = null;
+							ObjectInputStream lookup_in = null;
+							
+							try {
+								/* variables for hostname/port */
+								String hostname = "localhost";
+								int port = 4444;
+							
+									hostname = lookup_host;
+									port = lookup_port;
+								
+								lookupSocket = new Socket(hostname, port);
+	
+								lookup_out = new ObjectOutputStream(lookupSocket.getOutputStream());
+								lookup_in = new ObjectInputStream(lookupSocket.getInputStream());
+	
+							} catch (UnknownHostException e) {
+								//System.err.println("ERROR: Don't know where to connect!!");
+								//System.exit(1);
+								result = -1;
+							} catch (IOException e) {
+								//System.err.println("ERROR: Couldn't get I/O for the connection.");
+								//System.exit(1);
+								result = -1;
+							}
+							
+							if(result>=0)
+							{
+								String server = null;
+								if (role.equals("tse") )
+								{
+									server = "nasdaq";
+								}
+								else
+								{
+									server = "tse";
+								}
+								//System.out.println("looking up: " + server);
+								BrokerPacket packetToLookup = new BrokerPacket();
+								packetToLookup.type = BrokerPacket.LOOKUP_REQUEST;
+								packetToLookup.symbol = server;
+								lookup_out.writeObject(packetToLookup);
+								
+								BrokerPacket packetFromLookup;
+								packetFromLookup = (BrokerPacket) lookup_in.readObject();
+		
+								if (packetFromLookup.type == BrokerPacket.LOOKUP_ERROR)
+								{
+									//System.out.println(packetFromLookup.symbol);
+									conn = false;
+									//System.exit(-1);
+								}
+								else
+								{
+									//System.out.println(packetFromLookup.symbol);
+									String reply[] = packetFromLookup.symbol.split(";");
+									
+									broker_host = reply[1];
+									broker_port = reply[2];
+									conn = true;
+								}
+								
+								if (conn == true)
+								{
+									//System.out.println("Contacting the other server");
+									try {
+										/* variables for hostname/port */
+										String hostname = "localhost";
+										int port = 4444;
+									
+											hostname = broker_host;
+											port = Integer.parseInt(broker_port);
+										
+										brokerSocket = new Socket(hostname, port);
+		
+										broker_out = new ObjectOutputStream(brokerSocket.getOutputStream());
+										broker_in = new ObjectInputStream(brokerSocket.getInputStream());
+		
+									} catch (UnknownHostException e) {
+										//System.err.println("ERROR: Don't know where to connect!!");
+										//System.exit(1);
+										result = -1;
+									} catch (IOException e) {
+										//System.err.println("ERROR: Couldn't get I/O for the connection.");
+										//System.exit(1);
+										result = -1;
+									}
+									if(result>=0)
+									{
+										//System.out.println("connected to broker");
+										BrokerPacket packetToBroker = new BrokerPacket();
+										packetToBroker.type = BrokerPacket.BROKER_FORWARD;
+										packetToBroker.symbol = packetFromClient.symbol;
+										broker_out.writeObject(packetToBroker);
+										
+										BrokerPacket packetFromBroker;
+										packetFromBroker = (BrokerPacket) broker_in.readObject();
+										//System.out.println("type returned by other server is " + packetFromBroker.type);
+										if (packetFromBroker.type == BrokerPacket.BROKER_ERROR)
+										{
+											//System.out.println(packetFromLookup.symbol);
+											conn = false;
+											//System.exit(-1);
+										}
+										else
+										{
+											//System.out.println(packetFromLookup.symbol);
+											packetToClient.type = BrokerPacket.BROKER_QUOTE;
+											packetToClient.quote = packetFromBroker.quote;
+											result = 1;
+											conn = true;
+											bool=0;
+										}
+									}
+									
+								}
+							
+							}
+							if (brokerSocket != null)
+							{
+
+								broker_out.close();
+								broker_in.close();
+								brokerSocket.close();
+							}
+							
+							if (lookupSocket != null)
+							{
+								lookup_out.close();
+								lookup_in.close();
+													
+								lookupSocket.close();
+							}
+						}
+						if (conn == false || result<=0 || bool==-1)
+						{
+							packetToClient.quote = (long) 0;
+							packetToClient.type = BrokerPacket.BROKER_ERROR;
+							packetToClient.symbol = company_name.toUpperCase() + " invalid.";
+						}
 					}
 					
 					//String part1 = parts[0]; // 004
