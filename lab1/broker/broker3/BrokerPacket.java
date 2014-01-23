@@ -48,6 +48,7 @@ public class BrokerPacket implements Serializable {
 	public static final int LOOKUP_REQUEST  = 301;
 	public static final int LOOKUP_REPLY    = 302;
 	public static final int LOOKUP_REGISTER = 303;
+	public static final int LOOKUP_ERROR    = 313;
 	
 	/* error codes */
 	/* for part 2/3 */
